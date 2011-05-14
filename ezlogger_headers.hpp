@@ -13,7 +13,7 @@ and replace the header for the target policies with the custom policies.
 #include "ezlogger_output_policy.hpp"
 #include "ezlogger_format_policy.hpp"
 #include "ezlogger_verbosity_level_policy.hpp"
-#include "ezlogger_macros.hpp"
 #include "ezlogger.hpp"
+#include "ezlogger_macros.hpp"
 
 #endif //EZLOGGER_HEADERS_HPP_HEADER_GRD_

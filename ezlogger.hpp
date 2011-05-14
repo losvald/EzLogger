@@ -47,7 +47,7 @@ For details on verbosity level logging, see \ref VERBOSITY_LEVEL_LOGGING\n
 For detailed EzLogger usage, see ezlogger_macros.hpp\n
 */
 #ifndef EZLOGGER_HPP_HEADER_GRD_
-#define EZLOGGER_HPP_HEADER_GRD_ (1)
+#define EZLOGGER_HPP_HEADER_GRD_
 
 /*! @file ezlogger.hpp
 @brief ezlogger.hpp defines ezlogger class and implementation.
@@ -61,14 +61,10 @@ inserted into the logging.
 #include <sstream>
 #include <string>
 #include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#ifdef WIN32
-#else
-#define _vsnprintf vsnprintf
-#endif
+#include <cstdarg>
 
 #include "ezlogger_misc.hpp"
+
 namespace axter
 {
 	/*! @struct levels
@@ -81,7 +77,7 @@ namespace axter
 	*/
 	struct levels : public ext_data
 	{
-		levels(verbosity verbosity_level, severity severity_level,
+		levels(verbosity verbosity_level, severity severity_level, 
 			const char* pretty_function = NULL, const char* facility = NULL, 
 			const char* tag = NULL, int code = 0)
 			:ext_data(severity_level, pretty_function, facility, tag, code), 
@@ -124,9 +120,16 @@ namespace axter
 			}
 			return *this;
 		}
-
-
-
+		template<typename T> inline ezlogger& operator<<(const T& Data) {
+		  if (m_verbosity_level <= this->get_verbosity_level_tolerance())
+		  {
+		    if (m_alternate_output)
+		      (*m_alternate_output) << Data;
+		    else
+		      this->get_log_stream() << Data;
+		  }
+		  return *this;
+		}
 		inline ezlogger& operator<<(std::ostream& (*func)(std::ostream&))
 		{
 			if (m_verbosity_level <= this->get_verbosity_level_tolerance())
@@ -138,21 +141,6 @@ namespace axter
 			}
 			return *this;
 		}
-
-
-		inline ezlogger& operator<<(int data)
-		{
-			if (m_verbosity_level <= this->get_verbosity_level_tolerance())
-			{
-				if (m_alternate_output)
-					(*m_alternate_output) << data;
-				else
-					this->get_log_stream() << data;
-			}
-			return *this;
-		}
-
-
 
 		template<class T> void operator()(const T&Data) const{
 			if (m_verbosity_level <= this->get_verbosity_level_tolerance())
@@ -176,7 +164,7 @@ namespace axter
 				char Data[4096];
 				va_list v;
 				va_start(v,format);
-				_vsnprintf(Data, sizeof(Data), format,v);
+				vsnprintf(Data, sizeof(Data), format,v);
 				va_end(v);
 				log_out(m_src_file_name, m_src_line_num, m_src_function_name, m_levels_format_usage, true, Data);
 			}
@@ -206,7 +194,7 @@ namespace axter
 		bool log_if_fails_verification(bool eval, const char* evaluation)
 		{
 			if (!eval && m_verbosity_level <= this->get_verbosity_level_tolerance())
-				this->get_log_stream() << ezlogger_format_policy::get_log_prefix_format(m_src_file_name, m_src_line_num, m_src_function_name, m_levels_format_usage) <<
+				this->get_log_stream() << this->get_log_prefix_format(m_src_file_name, m_src_line_num, m_src_function_name, m_levels_format_usage) <<
 					"Failed verification:  '" << evaluation << "'" << std::endl;
 			return eval;
 		}
@@ -217,7 +205,7 @@ namespace axter
 			if (!Data) return std::string("Error: Bad pointer");
 			const int SizeDest = (int)wcslen(Data);
 			char *AnsiStr = new char[SizeDest+1];
-			wcstombs(AnsiStr, Data, SizeDest);
+			ezlogger<EZLOGGER_OUTPUT_POLICY, EZLOGGER_FORMAT_POLICY, EZLOGGER_VERBOSITY_LEVEL_POLICY>::wcstombs(AnsiStr, Data, SizeDest);
 			AnsiStr[SizeDest] = 0;
 			std::stringstream ss;
 			ss << AnsiStr;
@@ -229,7 +217,7 @@ namespace axter
 			if (!Data) return std::string("Error: Bad pointer");
 			const int SizeDest = (int)wcslen(Data);
 			char *AnsiStr = new char[SizeDest+1];
-			wcstombs(AnsiStr, Data, SizeDest);
+			ezlogger<EZLOGGER_OUTPUT_POLICY, EZLOGGER_FORMAT_POLICY, EZLOGGER_VERBOSITY_LEVEL_POLICY>::wcstombs(AnsiStr, Data, SizeDest);
 			AnsiStr[SizeDest] = 0;
 			std::stringstream ss;
 			ss << AnsiStr;
@@ -264,26 +252,28 @@ namespace axter
 		}
 
 		template<class T>
-			static void log_out(const char*FileName, int LineNo, const char*FunctionName, 
+			static void log_out(const char*FileName, int LineNo, const char*FunctionName,
 			ext_data levels_format_usage_data, bool endline, const T &Data)
 		{
-			ezlogger_output_policy::get_log_stream() << ezlogger_format_policy::get_log_prefix_format(FileName, LineNo, FunctionName, levels_format_usage_data) << to_str(Data);
-			if (endline) ezlogger_output_policy::get_log_stream() << std::endl;
+		  typedef ezlogger<EZLOGGER_OUTPUT_POLICY, EZLOGGER_FORMAT_POLICY, EZLOGGER_VERBOSITY_LEVEL_POLICY> ezlogger;
+			ezlogger::get_log_stream() << ezlogger::get_log_prefix_format(FileName, LineNo, FunctionName, levels_format_usage_data) << to_str(Data);
+			if (endline) ezlogger::get_log_stream() << std::endl;
 		}
 		template<class T1, class T2>
-		static void log_out(const char*FileName, int LineNo, const char*FunctionName, 
+		  static void log_out(const char*FileName, int LineNo, const char*FunctionName,
 		ext_data levels_format_usage_data, bool endline, const T1 &Data1, const T2 &Data2)
 		{
-			ezlogger_output_policy::get_log_stream() <<
-					ezlogger_format_policy::get_log_prefix_format(FileName, LineNo, FunctionName, levels_format_usage_data) << to_str(Data1) << ", "  << to_str(Data2);
-			if (endline) ezlogger_output_policy::get_log_stream() << std::endl;
+		  typedef ezlogger<EZLOGGER_OUTPUT_POLICY, EZLOGGER_FORMAT_POLICY, EZLOGGER_VERBOSITY_LEVEL_POLICY> ezlogger;
+			ezlogger::get_log_stream() << ezlogger::get_log_prefix_format(FileName, LineNo, FunctionName, levels_format_usage_data) << to_str(Data1) << ", "  << to_str(Data2);
+			if (endline) ezlogger::get_log_stream() << std::endl;
 		}
 		template<class T1, class T2, class T3>
-			static void log_out(const char*FileName, int LineNo, const char*FunctionName, 
+			static void log_out(const char*FileName, int LineNo, const char*FunctionName,
 			ext_data levels_format_usage_data, bool endline, const T1 &Data1, const T2 &Data2, const T3 &Data3)
 		{
-			ezlogger_output_policy::get_log_stream() << ezlogger_format_policy::get_log_prefix_format(FileName, LineNo, FunctionName, levels_format_usage_data) << to_str(Data1) << ", "  << to_str(Data2) << ", "  << to_str(Data3);
-			if (endline) ezlogger_output_policy::get_log_stream() << std::endl;
+		  typedef ezlogger<EZLOGGER_OUTPUT_POLICY, EZLOGGER_FORMAT_POLICY, EZLOGGER_VERBOSITY_LEVEL_POLICY> ezlogger;
+			ezlogger::get_log_stream() << ezlogger::get_log_prefix_format(FileName, LineNo, FunctionName, levels_format_usage_data) << to_str(Data1) << ", "  << to_str(Data2) << ", "  << to_str(Data3);
+			if (endline) ezlogger::get_log_stream() << std::endl;
 		}
 	};
 
